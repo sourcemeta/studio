@@ -14,7 +14,7 @@
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "25.x",
-    "@types/vscode": "^1.107.0",
+    "@types/vscode": "^1.109.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "chai": "^6.2.1",
