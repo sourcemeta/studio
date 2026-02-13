@@ -262,9 +262,25 @@ export function arrayToPosition(arr: [number, number]): vscode.Position {
 /**
  * Convert error position array to VS Code range
  * Position array is 1-based and inclusive, VS Code is 0-based and end-exclusive
+ *
+ * When a diagnostic applies to the root of the document (position spanning
+ * from line 1, column 1 across multiple lines, or across a single line in
+ * minified files), we collapse the range to
+ * a zero-width range at (0,0). VS Code renders this by expanding the
+ * squiggle to the first word, matching what ESLint and Pylint do. VS Code
+ * does not support file-level diagnostics without a range:
+ * https://github.com/microsoft/vscode/issues/238608
  */
 export function errorPositionToRange(position: Position): vscode.Range {
     const [lineStart, columnStart, lineEnd, columnEnd] = position;
+
+    if (lineStart === 1 && columnStart === 1 && (lineEnd > lineStart || columnEnd > columnStart)) {
+        return new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+        );
+    }
+
     return new vscode.Range(
         new vscode.Position(lineStart - 1, columnStart - 1),
         new vscode.Position(lineEnd - 1, columnEnd)

@@ -214,6 +214,135 @@ suite('Extension Test Suite', () => {
             'Sourcemeta Studio should still report metaschema errors');
     });
 
+    test('Should clamp root-level lint diagnostics to first token', async function() {
+        this.timeout(15000);
+
+        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
+        if (extension && !extension.isActive) {
+            await extension.activate();
+        }
+
+        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
+        const schemaPath = path.join(fixtureDir, 'root-only-lint-schema.json');
+
+        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
+        await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+
+        const lintDiagnostics = diagnostics.filter(diagnostic =>
+            diagnostic.source === 'Sourcemeta Studio (Lint)');
+
+        assert.ok(lintDiagnostics.length > 0,
+            'Root-level lint issues should still produce diagnostics');
+
+        for (const diagnostic of lintDiagnostics) {
+            assert.strictEqual(diagnostic.range.start.line, 0,
+                'Root-level diagnostic should start at line 0');
+            assert.strictEqual(diagnostic.range.start.character, 0,
+                'Root-level diagnostic should start at character 0');
+            assert.strictEqual(diagnostic.range.end.line, 0,
+                'Root-level diagnostic should not extend beyond line 0');
+            assert.strictEqual(diagnostic.range.end.character, 0,
+                'Root-level diagnostic should have zero-width range');
+        }
+    });
+
+    test('Should clamp root-level lint diagnostics on minified single-line files', async function() {
+        this.timeout(15000);
+
+        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
+        if (extension && !extension.isActive) {
+            await extension.activate();
+        }
+
+        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
+        const schemaPath = path.join(fixtureDir, 'minified-root-lint-schema.json');
+
+        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
+        await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+
+        const lintDiagnostics = diagnostics.filter(diagnostic =>
+            diagnostic.source === 'Sourcemeta Studio (Lint)');
+
+        assert.ok(lintDiagnostics.length > 0,
+            'Minified schema should still produce root-level lint diagnostics');
+
+        for (const diagnostic of lintDiagnostics) {
+            assert.strictEqual(diagnostic.range.start.line, 0,
+                'Root-level diagnostic should start at line 0');
+            assert.strictEqual(diagnostic.range.start.character, 0,
+                'Root-level diagnostic should start at character 0');
+            assert.strictEqual(diagnostic.range.end.line, 0,
+                'Root-level diagnostic should not extend beyond line 0');
+            assert.strictEqual(diagnostic.range.end.character, 0,
+                'Root-level diagnostic should have zero-width range');
+        }
+    });
+
+    test('Should clamp root-level metaschema diagnostics to first token', async function() {
+        this.timeout(15000);
+
+        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
+        if (extension && !extension.isActive) {
+            await extension.activate();
+        }
+
+        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
+        const schemaPath = path.join(fixtureDir, 'invalid-metaschema.json');
+
+        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
+        await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+
+        const metaschemaDiagnostics = diagnostics.filter(diagnostic =>
+            diagnostic.source === 'Sourcemeta Studio (Metaschema)');
+
+        assert.ok(metaschemaDiagnostics.length > 0,
+            'Metaschema errors should produce diagnostics');
+
+        const rootDiagnostics = metaschemaDiagnostics.filter(diagnostic =>
+            diagnostic.range.start.line === 0);
+
+        assert.ok(rootDiagnostics.length > 0,
+            'Should have root-level metaschema diagnostics');
+
+        for (const diagnostic of rootDiagnostics) {
+            assert.strictEqual(diagnostic.range.start.character, 0,
+                'Root-level metaschema diagnostic should start at character 0');
+            assert.strictEqual(diagnostic.range.end.line, 0,
+                'Root-level metaschema diagnostic should not extend beyond line 0');
+            assert.strictEqual(diagnostic.range.end.character, 0,
+                'Root-level metaschema diagnostic should have zero-width range');
+        }
+
+        const nonRootDiagnostics = metaschemaDiagnostics.filter(diagnostic =>
+            diagnostic.range.start.line > 0);
+
+        assert.ok(nonRootDiagnostics.length > 0,
+            'Should also have non-root metaschema diagnostics');
+
+        for (const diagnostic of nonRootDiagnostics) {
+            assert.ok(diagnostic.range.end.character > diagnostic.range.start.character,
+                'Non-root metaschema diagnostic should retain a non-zero-width range');
+        }
+    });
+
     test('Should run linter even when metaschema validation fails', async function() {
         this.timeout(15000);
 
