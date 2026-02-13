@@ -117,7 +117,7 @@ export class DiagnosticManager {
 
                 diagnostic.source = 'Sourcemeta Studio (Metaschema)';
 
-                if (error.instanceLocation) {
+                if (error.instanceLocation !== undefined) {
                     diagnostic.code = error.instanceLocation;
                 }
 

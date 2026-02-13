@@ -6,9 +6,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "pretest": "npm run compile",
-    "test": "vscode-test",
-    "test:headed": "vscode-test --headless=false",
-    "test:watch": "vscode-test --watch"
+    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/chai": "^5.2.3",

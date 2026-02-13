@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Schema with non-root lint issues",
+  "description": "Triggers enum_with_type and enum_to_const at non-root positions",
+  "examples": [
+    {
+      "status": "active"
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [ "active" ]
+    }
+  }
+}

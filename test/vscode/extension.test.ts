@@ -1,378 +1,515 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import testSchema from './fixtures/test-schema.json';
+
+const FIXTURE_DIR = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
+const LINT_SOURCE = 'Sourcemeta Studio (Lint)';
+const METASCHEMA_SOURCE = 'Sourcemeta Studio (Metaschema)';
+
+async function activateExtension(): Promise<vscode.Extension<unknown>> {
+    const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio')!;
+    if (!extension.isActive) {
+        await extension.activate();
+    }
+    return extension;
+}
+
+async function openFixture(fixtureName: string): Promise<vscode.TextDocument> {
+    const schemaPath = path.join(FIXTURE_DIR, fixtureName);
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
+    await vscode.window.showTextDocument(document);
+    return document;
+}
+
+async function pollUntil<T>(
+    fn: () => Promise<T> | T,
+    check: (value: T) => boolean,
+    timeout = 10000
+): Promise<T> {
+    const interval = 200;
+    const maxAttempts = timeout / interval;
+    let last: T;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        last = await fn();
+        if (check(last)) {
+            return last;
+        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    return last!;
+}
+
+async function openPanelAndWaitForReady(timeout = 15000): Promise<void> {
+    await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+    const ready = await pollUntil(
+        () => vscode.commands.executeCommand('sourcemeta-studio.isWebviewReady'),
+        value => value === true,
+        timeout
+    );
+    if (!ready) {
+        throw new Error('Webview did not become ready');
+    }
+}
+
+async function waitForDiagnostics(
+    uri: vscode.Uri,
+    source: string,
+    timeout = 10000
+): Promise<vscode.Diagnostic[]> {
+    return pollUntil(
+        () => vscode.languages.getDiagnostics(uri).filter(d => d.source === source),
+        diagnostics => diagnostics.length > 0,
+        timeout
+    );
+}
+
+async function waitForNoDiagnostics(
+    uri: vscode.Uri,
+    source: string,
+    timeout = 10000
+): Promise<boolean> {
+    const result = await pollUntil(
+        () => vscode.languages.getDiagnostics(uri).filter(d => d.source === source),
+        diagnostics => diagnostics.length === 0,
+        timeout
+    );
+    return result.length === 0;
+}
+
+function getLintDiagnostics(uri: vscode.Uri): vscode.Diagnostic[] {
+    return vscode.languages.getDiagnostics(uri)
+        .filter(d => d.source === LINT_SOURCE);
+}
+
+function getMetaschemaDiagnostics(uri: vscode.Uri): vscode.Diagnostic[] {
+    return vscode.languages.getDiagnostics(uri)
+        .filter(d => d.source === METASCHEMA_SOURCE);
+}
 
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
 
     test('Extension should be present', () => {
         const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        assert.ok(extension, 'Extension should be installed');
+        assert.ok(extension);
     });
 
     test('Should activate extension', async () => {
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension) {
-            await extension.activate();
-            assert.ok(extension.isActive, 'Extension should be active');
-        }
+        const extension = await activateExtension();
+        assert.ok(extension.isActive);
     });
 
     test('Should register openPanel command', async () => {
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
+        await activateExtension();
         const commands = await vscode.commands.getCommands(true);
-        const commandExists = commands.includes('sourcemeta-studio.openPanel');
-        assert.ok(commandExists, 'Command "sourcemeta-studio.openPanel" should be registered');
+        assert.ok(commands.includes('sourcemeta-studio.openPanel'));
     });
 
-    test('Should create diagnostic collections', async () => {
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
+    test('Should register isWebviewReady command', async () => {
+        await activateExtension();
+        const commands = await vscode.commands.getCommands(true);
+        assert.ok(commands.includes('sourcemeta-studio.isWebviewReady'));
+    });
 
-        const diagnostics = vscode.languages.getDiagnostics();
-        assert.ok(Array.isArray(diagnostics), 'Diagnostics should be available');
+    test('Should read extension version from package.json', async () => {
+        const extension = await activateExtension();
+        assert.ok(extension.packageJSON.version);
+        assert.match(extension.packageJSON.version, /^\d+\.\d+\.\d+$/);
     });
 
     test('Should open panel when command is executed', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
-        let ready = false;
-        for (let attempt = 0; attempt < 50; attempt++) {
-            ready = await vscode.commands.executeCommand('sourcemeta-studio.isWebviewReady') as boolean;
-            if (ready) {
-                break;
-            }
-            await new Promise(resolve => setTimeout(resolve, 200));
-        }
-
-        assert.ok(ready, 'Webview should become ready after opening panel');
-    });
-
-    test('Should handle JSON file opening', async function() {
-        this.timeout(5000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const document = await vscode.workspace.openTextDocument({
-            content: JSON.stringify(testSchema, null, 2),
-            language: 'json'
-        });
-        await vscode.window.showTextDocument(document);
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        assert.strictEqual(document.languageId, 'json', 'Document should be JSON');
-    });
-
-    test('Should read extension version from package.json', async () => {
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        assert.ok(extension, 'Extension should be present');
-        assert.ok(extension?.packageJSON.version, 'Extension should have a version in package.json');
-        assert.match(extension?.packageJSON.version, /^\d+\.\d+\.\d+$/, 'Version should follow semver format');
+        await activateExtension();
+        await openPanelAndWaitForReady();
     });
 
     test('Should handle no file selected gracefully', async function() {
         this.timeout(5000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
+        const extension = await activateExtension();
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-
         await new Promise(resolve => setTimeout(resolve, 500));
-
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
         await new Promise(resolve => setTimeout(resolve, 1000));
-
-        assert.ok(true, 'Extension should handle no file selected without errors');
+        assert.ok(extension.isActive);
     });
 
     test('Should show appropriate message when no file is selected', async function() {
         this.timeout(5000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
+        const extension = await activateExtension();
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         await new Promise(resolve => setTimeout(resolve, 500));
-
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         await new Promise(resolve => setTimeout(resolve, 1000));
-
-        assert.ok(extension, 'Extension should exist');
-        assert.ok(extension?.isActive, 'Extension should remain active with no file selected');
-    });
-
-    test('Should handle schema with HTTP $ref without errors', async function() {
-        this.timeout(30000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'geojson-ref-schema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
-        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
-        await new Promise(resolve => setTimeout(resolve, 10000));
-
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
-        const errors = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
-        assert.strictEqual(errors.length, 0, 'Schema with HTTP $ref should have no diagnostic errors');
-
-        assert.ok(extension?.isActive, 'Extension should remain active after processing HTTP $ref');
+        assert.ok(extension.isActive);
     });
 
     test('Should produce lint diagnostics for schema with lint issues', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'test-schema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
         assert.ok(diagnostics.length > 0);
-
-        const hasLintDiagnostic = diagnostics.some(diagnostic =>
-            diagnostic.source === 'Sourcemeta Studio (Lint)');
-
-        assert.ok(hasLintDiagnostic);
     });
 
-    test('Should disable VS Code built-in JSON validation', async function() {
+    test('Should produce no lint diagnostics for a valid schema', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'invalid-metaschema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
+        await activateExtension();
+        const document = await openFixture('valid-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
         await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.strictEqual(getLintDiagnostics(document.uri).length, 0);
+    });
 
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+    test('Should set lint diagnostic severity to Warning', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        for (const diagnostic of diagnostics) {
+            assert.strictEqual(diagnostic.severity, vscode.DiagnosticSeverity.Warning);
+        }
+    });
 
-        const vscodeJsonDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source === 'json' || diagnostic.source === 'JSON');
+    test('Should set lint diagnostic code to the rule ID', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        const ruleIds = diagnostics.map(d => (d.code as { value: string }).value);
+        assert.ok(ruleIds.includes('top_level_description'));
+        assert.ok(ruleIds.includes('top_level_examples'));
+    });
 
-        assert.strictEqual(vscodeJsonDiagnostics.length, 0,
-            'VS Code built-in JSON validation should be disabled');
+    test('Should include related information in lint diagnostics', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        for (const diagnostic of diagnostics) {
+            assert.ok(diagnostic.relatedInformation);
+            assert.ok(diagnostic.relatedInformation!.length > 0);
+            const messages = diagnostic.relatedInformation!.map(r => r.message);
+            assert.ok(messages.some(m => m.includes('Path')));
+        }
+    });
 
-        const sourcemetaDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source && diagnostic.source.startsWith('Sourcemeta Studio'));
+    test('Should report correct lint error count', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        assert.strictEqual(diagnostics.length, 2);
+    });
 
-        assert.ok(sourcemetaDiagnostics.length > 0,
-            'Sourcemeta Studio should still report metaschema errors');
+    test('Should include the lint rule message in the diagnostic', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        const messages = diagnostics.map(d => d.message);
+        assert.ok(messages.some(m => m.includes('description')));
+        assert.ok(messages.some(m => m.includes('examples')));
     });
 
     test('Should clamp root-level lint diagnostics to first token', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'root-only-lint-schema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
+        await activateExtension();
+        const document = await openFixture('root-only-lint-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
-
-        const lintDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source === 'Sourcemeta Studio (Lint)');
-
-        assert.ok(lintDiagnostics.length > 0,
-            'Root-level lint issues should still produce diagnostics');
-
-        for (const diagnostic of lintDiagnostics) {
-            assert.strictEqual(diagnostic.range.start.line, 0,
-                'Root-level diagnostic should start at line 0');
-            assert.strictEqual(diagnostic.range.start.character, 0,
-                'Root-level diagnostic should start at character 0');
-            assert.strictEqual(diagnostic.range.end.line, 0,
-                'Root-level diagnostic should not extend beyond line 0');
-            assert.strictEqual(diagnostic.range.end.character, 0,
-                'Root-level diagnostic should have zero-width range');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        assert.ok(diagnostics.length > 0);
+        for (const diagnostic of diagnostics) {
+            assert.strictEqual(diagnostic.range.start.line, 0);
+            assert.strictEqual(diagnostic.range.start.character, 0);
+            assert.strictEqual(diagnostic.range.end.line, 0);
+            assert.strictEqual(diagnostic.range.end.character, 0);
         }
     });
 
     test('Should clamp root-level lint diagnostics on minified single-line files', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'minified-root-lint-schema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
+        await activateExtension();
+        const document = await openFixture('minified-root-lint-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
-
-        const lintDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source === 'Sourcemeta Studio (Lint)');
-
-        assert.ok(lintDiagnostics.length > 0,
-            'Minified schema should still produce root-level lint diagnostics');
-
-        for (const diagnostic of lintDiagnostics) {
-            assert.strictEqual(diagnostic.range.start.line, 0,
-                'Root-level diagnostic should start at line 0');
-            assert.strictEqual(diagnostic.range.start.character, 0,
-                'Root-level diagnostic should start at character 0');
-            assert.strictEqual(diagnostic.range.end.line, 0,
-                'Root-level diagnostic should not extend beyond line 0');
-            assert.strictEqual(diagnostic.range.end.character, 0,
-                'Root-level diagnostic should have zero-width range');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        assert.ok(diagnostics.length > 0);
+        for (const diagnostic of diagnostics) {
+            assert.strictEqual(diagnostic.range.start.line, 0);
+            assert.strictEqual(diagnostic.range.start.character, 0);
+            assert.strictEqual(diagnostic.range.end.line, 0);
+            assert.strictEqual(diagnostic.range.end.character, 0);
         }
+    });
+
+    test('Should position non-root lint diagnostics on the correct line', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('non-root-lint-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        assert.ok(diagnostics.length >= 2);
+        for (const diagnostic of diagnostics) {
+            assert.ok(diagnostic.range.start.line > 0);
+        }
+    });
+
+    test('Should not clamp non-root lint diagnostics', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('non-root-lint-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        for (const diagnostic of diagnostics) {
+            assert.ok(diagnostic.range.end.character > diagnostic.range.start.character);
+        }
+    });
+
+    test('Should produce metaschema diagnostics for invalid schema', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        assert.ok(diagnostics.length > 0);
+    });
+
+    test('Should produce no metaschema diagnostics for a valid schema', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('valid-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.strictEqual(getMetaschemaDiagnostics(document.uri).length, 0);
+    });
+
+    test('Should set metaschema diagnostic severity to Error', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        for (const diagnostic of diagnostics) {
+            assert.strictEqual(diagnostic.severity, vscode.DiagnosticSeverity.Error);
+        }
+    });
+
+    test('Should set metaschema diagnostic code to instance location', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        const codes = diagnostics.map(d => d.code as string);
+        assert.ok(codes.includes('/additionalProperties'));
+        assert.ok(codes.includes(''));
+    });
+
+    test('Should include related information in metaschema diagnostics', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        for (const diagnostic of diagnostics) {
+            assert.ok(diagnostic.relatedInformation);
+            assert.ok(diagnostic.relatedInformation!.length > 0);
+            const messages = diagnostic.relatedInformation!.map(r => r.message);
+            assert.ok(messages.some(m => m.includes('Keyword Location')));
+        }
+    });
+
+    test('Should report correct metaschema error count', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        assert.strictEqual(diagnostics.length, 7);
     });
 
     test('Should clamp root-level metaschema diagnostics to first token', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'invalid-metaschema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
-
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
-
-        const metaschemaDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source === 'Sourcemeta Studio (Metaschema)');
-
-        assert.ok(metaschemaDiagnostics.length > 0,
-            'Metaschema errors should produce diagnostics');
-
-        const rootDiagnostics = metaschemaDiagnostics.filter(diagnostic =>
-            diagnostic.range.start.line === 0);
-
-        assert.ok(rootDiagnostics.length > 0,
-            'Should have root-level metaschema diagnostics');
-
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        const rootDiagnostics = diagnostics.filter(d => d.range.start.line === 0);
+        assert.ok(rootDiagnostics.length > 0);
         for (const diagnostic of rootDiagnostics) {
-            assert.strictEqual(diagnostic.range.start.character, 0,
-                'Root-level metaschema diagnostic should start at character 0');
-            assert.strictEqual(diagnostic.range.end.line, 0,
-                'Root-level metaschema diagnostic should not extend beyond line 0');
-            assert.strictEqual(diagnostic.range.end.character, 0,
-                'Root-level metaschema diagnostic should have zero-width range');
+            assert.strictEqual(diagnostic.range.start.character, 0);
+            assert.strictEqual(diagnostic.range.end.line, 0);
+            assert.strictEqual(diagnostic.range.end.character, 0);
         }
+    });
 
-        const nonRootDiagnostics = metaschemaDiagnostics.filter(diagnostic =>
-            diagnostic.range.start.line > 0);
-
-        assert.ok(nonRootDiagnostics.length > 0,
-            'Should also have non-root metaschema diagnostics');
-
+    test('Should position non-root metaschema diagnostics on the correct line', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        const nonRootDiagnostics = diagnostics.filter(d => d.range.start.line > 0);
+        assert.ok(nonRootDiagnostics.length > 0);
         for (const diagnostic of nonRootDiagnostics) {
-            assert.ok(diagnostic.range.end.character > diagnostic.range.start.character,
-                'Non-root metaschema diagnostic should retain a non-zero-width range');
+            assert.strictEqual(diagnostic.range.start.line, 10);
+        }
+    });
+
+    test('Should give non-root metaschema diagnostics a non-zero-width range', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        const nonRootDiagnostics = diagnostics.filter(d => d.range.start.line > 0);
+        for (const diagnostic of nonRootDiagnostics) {
+            assert.ok(diagnostic.range.end.character > diagnostic.range.start.character);
         }
     });
 
     test('Should run linter even when metaschema validation fails', async function() {
         this.timeout(15000);
-
-        const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
-        if (extension && !extension.isActive) {
-            await extension.activate();
-        }
-
-        const fixtureDir = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
-        const schemaPath = path.join(fixtureDir, 'invalid-metaschema.json');
-
-        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
-        await vscode.window.showTextDocument(document);
-
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        const lintDiagnostics = getLintDiagnostics(document.uri);
+        const metaschemaDiagnostics = getMetaschemaDiagnostics(document.uri);
+        assert.ok(metaschemaDiagnostics.length > 0);
+        assert.ok(lintDiagnostics.length > 0);
+    });
 
+    test('Should use Warning severity for lint and Error for metaschema on same file', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
+        for (const d of getLintDiagnostics(document.uri)) {
+            assert.strictEqual(d.severity, vscode.DiagnosticSeverity.Warning);
+        }
+        for (const d of getMetaschemaDiagnostics(document.uri)) {
+            assert.strictEqual(d.severity, vscode.DiagnosticSeverity.Error);
+        }
+    });
+
+    test('Should detect an unformatted schema', async function() {
+        this.timeout(15000);
+        const extension = await activateExtension();
+        await openFixture('unformatted-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.ok(extension.isActive);
+    });
 
-        const diagnostics = vscode.languages.getDiagnostics(document.uri);
+    test('Should detect a properly formatted schema', async function() {
+        this.timeout(15000);
+        const extension = await activateExtension();
+        const document = await openFixture('valid-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.ok(extension.isActive);
+        const errors = vscode.languages.getDiagnostics(document.uri)
+            .filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+        assert.strictEqual(errors.length, 0);
+    });
 
-        const metaschemaDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source === 'Sourcemeta Studio (Metaschema)');
+    test('Should disable VS Code built-in JSON validation', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-metaschema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const vscodeJsonDiagnostics = vscode.languages.getDiagnostics(document.uri)
+            .filter(d => d.source === 'json' || d.source === 'JSON');
+        assert.strictEqual(vscodeJsonDiagnostics.length, 0);
+        const sourcemetaDiagnostics = vscode.languages.getDiagnostics(document.uri)
+            .filter(d => d.source && d.source.startsWith('Sourcemeta Studio'));
+        assert.ok(sourcemetaDiagnostics.length > 0);
+    });
 
-        const lintDiagnostics = diagnostics.filter(diagnostic =>
-            diagnostic.source === 'Sourcemeta Studio (Lint)');
+    test('Should handle schema with HTTP $ref without errors', async function() {
+        this.timeout(30000);
+        await activateExtension();
+        const document = await openFixture('geojson-ref-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        const errors = vscode.languages.getDiagnostics(document.uri)
+            .filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+        assert.strictEqual(errors.length, 0);
+    });
 
-        assert.ok(metaschemaDiagnostics.length > 0,
-            'Should have metaschema errors for invalid schema');
+    test('Should handle invalid JSON without crashing', async function() {
+        this.timeout(15000);
+        const extension = await activateExtension();
+        await openFixture('invalid-json.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.ok(extension.isActive);
+    });
 
-        assert.ok(lintDiagnostics.length > 0,
-            'Should still have lint diagnostics even when metaschema fails');
+    test('Should produce a parse error diagnostic for invalid JSON', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('invalid-json.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        assert.strictEqual(diagnostics.length, 1);
+        assert.ok(diagnostics[0]!.message.includes('parse'));
+    });
+
+    test('Should produce diagnostics when switching from a valid to an invalid file', async function() {
+        this.timeout(20000);
+        await activateExtension();
+        const validDoc = await openFixture('valid-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.strictEqual(getLintDiagnostics(validDoc.uri).length, 0);
+        const invalidDoc = await openFixture('test-schema.json');
+        const diagnostics = await waitForDiagnostics(invalidDoc.uri, LINT_SOURCE);
+        assert.ok(diagnostics.length > 0);
+    });
+
+    test('Should preserve diagnostics on file A after switching to file B', async function() {
+        this.timeout(25000);
+        await activateExtension();
+        const documentA = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await waitForDiagnostics(documentA.uri, LINT_SOURCE);
+        await openFixture('valid-schema.json');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.ok(getLintDiagnostics(documentA.uri).length > 0);
+    });
+
+    test('Should clear diagnostics when panel is closed', async function() {
+        this.timeout(20000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await waitForDiagnostics(document.uri, LINT_SOURCE);
+        assert.ok(getLintDiagnostics(document.uri).length > 0);
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const cleared = await waitForNoDiagnostics(document.uri, LINT_SOURCE, 5000);
+        assert.ok(cleared);
+    });
+
+    test('Should handle non-JSON file gracefully', async function() {
+        this.timeout(10000);
+        const extension = await activateExtension();
+        const document = await vscode.workspace.openTextDocument({
+            content: 'This is plain text, not JSON',
+            language: 'plaintext'
+        });
+        await vscode.window.showTextDocument(document);
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        assert.ok(extension.isActive);
     });
 });

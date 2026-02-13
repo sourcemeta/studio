@@ -11,6 +11,7 @@ export class PanelManager {
     private readonly iconPath: vscode.Uri;
     private readonly extensionPath: string;
     private messageHandler?: (message: WebviewToExtensionMessage) => void;
+    private disposeHandler?: () => void;
 
     constructor(extensionPath: string) {
         this.extensionPath = extensionPath;
@@ -22,6 +23,10 @@ export class PanelManager {
      */
     setMessageHandler(handler: (message: WebviewToExtensionMessage) => void): void {
         this.messageHandler = handler;
+    }
+
+    setDisposeHandler(handler: () => void): void {
+        this.disposeHandler = handler;
     }
 
     /**
@@ -70,10 +75,12 @@ export class PanelManager {
             context.subscriptions
         );
 
-        // Handle panel disposal
         this.panel.onDidDispose(
             () => {
                 this.panel = undefined;
+                if (this.disposeHandler) {
+                    this.disposeHandler();
+                }
             },
             null,
             context.subscriptions

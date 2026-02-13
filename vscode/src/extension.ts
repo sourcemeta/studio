@@ -54,6 +54,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         handleWebviewMessage(message);
     });
 
+    panelManager.setDisposeHandler(() => {
+        diagnosticManager.clearAll();
+    });
+
     const openPanelCommand = vscode.commands.registerCommand('sourcemeta-studio.openPanel', () => {
         webviewReady = false;
         panelManager.createOrReveal(context);
