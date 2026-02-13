@@ -41,7 +41,7 @@ suite('Extension Test Suite', () => {
     });
 
     test('Should open panel when command is executed', async function() {
-        this.timeout(5000);
+        this.timeout(15000);
 
         const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
         if (extension && !extension.isActive) {
@@ -50,10 +50,16 @@ suite('Extension Test Suite', () => {
 
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        let ready = false;
+        for (let attempt = 0; attempt < 50; attempt++) {
+            ready = await vscode.commands.executeCommand('sourcemeta-studio.isWebviewReady') as boolean;
+            if (ready) {
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
 
-        const ready = await vscode.commands.executeCommand('sourcemeta-studio.isWebviewReady') as boolean;
-        assert.ok(ready);
+        assert.ok(ready, 'Webview should become ready after opening panel');
     });
 
     test('Should handle JSON file opening', async function() {
