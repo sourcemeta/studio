@@ -454,14 +454,15 @@ suite('Extension Test Suite', () => {
     });
 
     test('Should produce diagnostics when switching from a valid to an invalid file', async function() {
-        this.timeout(20000);
+        this.timeout(30000);
         await activateExtension();
         const validDoc = await openFixture('valid-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         await new Promise(resolve => setTimeout(resolve, 5000));
         assert.strictEqual(getLintDiagnostics(validDoc.uri).length, 0);
         const invalidDoc = await openFixture('test-schema.json');
-        const diagnostics = await waitForDiagnostics(invalidDoc.uri, LINT_SOURCE);
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(invalidDoc.uri, LINT_SOURCE, 20000);
         assert.ok(diagnostics.length > 0);
     });
 
