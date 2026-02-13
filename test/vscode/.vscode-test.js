@@ -1,14 +1,16 @@
 const { defineConfig } = require('@vscode/test-cli');
+const fs = require('fs');
 const path = require('path');
 
-const buildTestDir = path.resolve(__dirname, '../../build/test/vscode');
+const cacheDir = path.resolve(__dirname, '.vscode-test');
+fs.mkdirSync(cacheDir, { recursive: true });
 
 const config = {
-  files: '../../build/test/vscode/**/*.test.js',
-  cachePath: path.join(buildTestDir, '.vscode-test'),
+  files: 'extension.test.js',
+  cachePath: cacheDir,
   launchArgs: [
-    '--user-data-dir', path.join(buildTestDir, '.vscode-test/user-data'),
-    '--extensions-dir', path.join(buildTestDir, '.vscode-test/extensions')
+    '--user-data-dir', path.join(cacheDir, 'user-data'),
+    '--extensions-dir', path.join(cacheDir, 'extensions')
   ],
   mocha: {
     ui: 'tdd',

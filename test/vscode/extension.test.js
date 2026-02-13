@@ -1,34 +1,31 @@
-import * as assert from 'assert';
-import * as vscode from 'vscode';
-import * as path from 'path';
+const assert = require('assert');
+const vscode = require('vscode');
+const path = require('path');
 
-const FIXTURE_DIR = path.join(__dirname, '..', '..', '..', 'test', 'vscode', 'fixtures');
+const FIXTURE_DIR = path.join(__dirname, 'fixtures');
 const LINT_SOURCE = 'Sourcemeta Studio (Lint)';
 const METASCHEMA_SOURCE = 'Sourcemeta Studio (Metaschema)';
 
-async function activateExtension(): Promise<vscode.Extension<unknown>> {
-    const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio')!;
+async function activateExtension() {
+    const extension = vscode.extensions.getExtension('sourcemeta.sourcemeta-studio');
+    assert.ok(extension);
     if (!extension.isActive) {
         await extension.activate();
     }
     return extension;
 }
 
-async function openFixture(fixtureName: string): Promise<vscode.TextDocument> {
+async function openFixture(fixtureName) {
     const schemaPath = path.join(FIXTURE_DIR, fixtureName);
     const document = await vscode.workspace.openTextDocument(vscode.Uri.file(schemaPath));
     await vscode.window.showTextDocument(document);
     return document;
 }
 
-async function pollUntil<T>(
-    fn: () => Promise<T> | T,
-    check: (value: T) => boolean,
-    timeout = 10000
-): Promise<T> {
+async function pollUntil(fn, check, timeout = 10000) {
     const interval = 200;
     const maxAttempts = timeout / interval;
-    let last: T;
+    let last;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         last = await fn();
         if (check(last)) {
@@ -36,10 +33,10 @@ async function pollUntil<T>(
         }
         await new Promise(resolve => setTimeout(resolve, interval));
     }
-    return last!;
+    return last;
 }
 
-async function openPanelAndWaitForReady(timeout = 15000): Promise<void> {
+async function openPanelAndWaitForReady(timeout = 15000) {
     await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
     const ready = await pollUntil(
         () => vscode.commands.executeCommand('sourcemeta-studio.isWebviewReady'),
@@ -51,11 +48,7 @@ async function openPanelAndWaitForReady(timeout = 15000): Promise<void> {
     }
 }
 
-async function waitForDiagnostics(
-    uri: vscode.Uri,
-    source: string,
-    timeout = 10000
-): Promise<vscode.Diagnostic[]> {
+async function waitForDiagnostics(uri, source, timeout = 10000) {
     return pollUntil(
         () => vscode.languages.getDiagnostics(uri).filter(d => d.source === source),
         diagnostics => diagnostics.length > 0,
@@ -63,11 +56,7 @@ async function waitForDiagnostics(
     );
 }
 
-async function waitForNoDiagnostics(
-    uri: vscode.Uri,
-    source: string,
-    timeout = 10000
-): Promise<boolean> {
+async function waitForNoDiagnostics(uri, source, timeout = 10000) {
     const result = await pollUntil(
         () => vscode.languages.getDiagnostics(uri).filter(d => d.source === source),
         diagnostics => diagnostics.length === 0,
@@ -76,12 +65,12 @@ async function waitForNoDiagnostics(
     return result.length === 0;
 }
 
-function getLintDiagnostics(uri: vscode.Uri): vscode.Diagnostic[] {
+function getLintDiagnostics(uri) {
     return vscode.languages.getDiagnostics(uri)
         .filter(d => d.source === LINT_SOURCE);
 }
 
-function getMetaschemaDiagnostics(uri: vscode.Uri): vscode.Diagnostic[] {
+function getMetaschemaDiagnostics(uri) {
     return vscode.languages.getDiagnostics(uri)
         .filter(d => d.source === METASCHEMA_SOURCE);
 }
@@ -178,7 +167,7 @@ suite('Extension Test Suite', () => {
         const document = await openFixture('test-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
-        const ruleIds = diagnostics.map(d => (d.code as { value: string }).value);
+        const ruleIds = diagnostics.map(d => d.code.value);
         assert.ok(ruleIds.includes('top_level_description'));
         assert.ok(ruleIds.includes('top_level_examples'));
     });
@@ -191,8 +180,8 @@ suite('Extension Test Suite', () => {
         const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
         for (const diagnostic of diagnostics) {
             assert.ok(diagnostic.relatedInformation);
-            assert.ok(diagnostic.relatedInformation!.length > 0);
-            const messages = diagnostic.relatedInformation!.map(r => r.message);
+            assert.ok(diagnostic.relatedInformation.length > 0);
+            const messages = diagnostic.relatedInformation.map(r => r.message);
             assert.ok(messages.some(m => m.includes('Path')));
         }
     });
@@ -305,7 +294,7 @@ suite('Extension Test Suite', () => {
         const document = await openFixture('invalid-metaschema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
-        const codes = diagnostics.map(d => d.code as string);
+        const codes = diagnostics.map(d => d.code);
         assert.ok(codes.includes('/additionalProperties'));
         assert.ok(codes.includes(''));
     });
@@ -318,8 +307,8 @@ suite('Extension Test Suite', () => {
         const diagnostics = await waitForDiagnostics(document.uri, METASCHEMA_SOURCE);
         for (const diagnostic of diagnostics) {
             assert.ok(diagnostic.relatedInformation);
-            assert.ok(diagnostic.relatedInformation!.length > 0);
-            const messages = diagnostic.relatedInformation!.map(r => r.message);
+            assert.ok(diagnostic.relatedInformation.length > 0);
+            const messages = diagnostic.relatedInformation.map(r => r.message);
             assert.ok(messages.some(m => m.includes('Keyword Location')));
         }
     });
@@ -461,7 +450,7 @@ suite('Extension Test Suite', () => {
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
         assert.strictEqual(diagnostics.length, 1);
-        assert.ok(diagnostics[0]!.message.includes('parse'));
+        assert.ok(diagnostics[0].message.includes('parse'));
     });
 
     test('Should produce diagnostics when switching from a valid to an invalid file', async function() {
