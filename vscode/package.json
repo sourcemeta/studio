@@ -23,7 +23,7 @@
     "url": "git+https://github.com/sourcemeta/studio.git"
   },
   "activationEvents": [],
-  "main": "../build/vscode/extension.js",
+  "main": "./index.js",
   "contributes": {
     "commands": [
       {
@@ -74,23 +74,7 @@
     "json lint"
   ],
   "qna": "marketplace",
-  "scripts": {
-    "compile": "node esbuild.js",
-    "watch": "node esbuild.js --watch",
-    "package": "node esbuild.js --production",
-    "build": "npm run compile",
-    "lint": "eslint src --ext ts"
-  },
   "dependencies": {
     "@sourcemeta/jsonschema": "^14.10.0"
-  },
-  "devDependencies": {
-    "@types/node": "24.x",
-    "@types/vscode": "^1.74.0",
-    "@typescript-eslint/eslint-plugin": "^8.48.0",
-    "@typescript-eslint/parser": "^8.50.0",
-    "esbuild": "^0.27.0",
-    "eslint": "^9.39.1",
-    "typescript": "^5.3.0"
   }
 }

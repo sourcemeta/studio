@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig.base.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
     "target": "ES2022",
@@ -13,5 +13,5 @@
     "jsx": "react-jsx",
     "erasableSyntaxOnly": true
   },
-  "include": ["src", "vite.config.ts", "../shared"]
+  "include": ["src", "vite.config.ts"]
 }

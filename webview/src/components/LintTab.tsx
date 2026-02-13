@@ -1,4 +1,4 @@
-import type { LintResult, Position } from '../../../protocol/types';
+import type { LintResult, Position } from '../protocol/types';
 import { goToPosition } from '../message';
 import { RawOutput } from './RawOutput';
 import { CheckCircle, FileQuestion } from 'lucide-react';

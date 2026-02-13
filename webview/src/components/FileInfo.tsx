@@ -1,4 +1,4 @@
-import type { FileInfo as FileInfoType } from '../../../protocol/types';
+import type { FileInfo as FileInfoType } from '../protocol/types';
 
 export interface FileInfoProps {
   fileInfo: FileInfoType | null;

@@ -1,4 +1,4 @@
-import type { MetaschemaResult, MetaschemaError, Position } from '../../../protocol/types';
+import type { MetaschemaResult, MetaschemaError, Position } from '../protocol/types';
 import { goToPosition } from '../message';
 import { RawOutput } from './RawOutput';
 import { CheckCircle, AlertTriangle, FileQuestion } from 'lucide-react';

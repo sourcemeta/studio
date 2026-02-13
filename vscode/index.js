@@ -1,19 +1,18 @@
-import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
-import { spawn } from '@sourcemeta/jsonschema';
-import { PanelState, WebviewToExtensionMessage, CommandResult, FileInfo, LintResult, LintError, MetaschemaResult, MetaschemaError, CliError, Position } from '../../protocol/types';
+const vscode = require('vscode');
+const path = require('path');
+const fs = require('fs');
+const { spawn } = require('@sourcemeta/jsonschema');
 
-let panel: vscode.WebviewPanel | undefined;
-let lintDiagnostics: vscode.DiagnosticCollection;
-let metaschemaDiagnostics: vscode.DiagnosticCollection;
-let lastActiveTextEditor: vscode.TextEditor | undefined;
+let panel;
+let lintDiagnostics;
+let metaschemaDiagnostics;
+let lastActiveTextEditor;
 let cachedCliVersion = 'Loading...';
 let extensionVersion = 'Loading...';
-let currentPanelState: PanelState | null = null;
+let currentPanelState = null;
 let webviewReady = false;
 
-async function executeCommand(args: string[]): Promise<CommandResult> {
+async function executeCommand(args) {
     const result = await spawn(args, { json: true });
     const output = typeof result.stdout === 'string'
         ? result.stdout
@@ -21,28 +20,28 @@ async function executeCommand(args: string[]): Promise<CommandResult> {
     return { output: output.trim(), exitCode: result.code };
 }
 
-async function getVersion(): Promise<string> {
+async function getVersion() {
     try {
         const result = await spawn(['version'], { json: false });
-        const output = ((result.stdout as string) || '').trim();
+        const output = ((result.stdout) || '').trim();
         return result.code === 0 ? output : `Error: ${output}`;
     } catch (error) {
-        return `Error: ${(error as Error).message}`;
+        return `Error: ${error.message}`;
     }
 }
 
-function parseCliError(output: string): CliError | null {
+function parseCliError(output) {
     try {
         const parsed = JSON.parse(output);
         if (parsed.error && typeof parsed.error === 'string') {
-            return parsed as CliError;
+            return parsed;
         }
     } catch {
     }
     return null;
 }
 
-function hasJsonParseErrors(lintResult: LintResult, metaschemaResult: MetaschemaResult): boolean {
+function hasJsonParseErrors(lintResult, metaschemaResult) {
     const lintHasParseError = lintResult.errors?.some(error =>
         error.id === 'json-parse-error' ||
         error.message.toLowerCase().includes('failed to parse')
@@ -53,7 +52,7 @@ function hasJsonParseErrors(lintResult: LintResult, metaschemaResult: Metaschema
     return !!(lintHasParseError || metaschemaHasParseError);
 }
 
-function getFileInfo(filePath: string | undefined): FileInfo | null {
+function getFileInfo(filePath) {
     if (!filePath) {
         return null;
     }
@@ -84,7 +83,7 @@ function getFileInfo(filePath: string | undefined): FileInfo | null {
     };
 }
 
-function parseLintResult(lintOutput: string): LintResult {
+function parseLintResult(lintOutput) {
     try {
         const parsed = JSON.parse(lintOutput);
 
@@ -143,8 +142,8 @@ function parseLintResult(lintOutput: string): LintResult {
     }
 }
 
-function parseMetaschemaResult(output: string, exitCode: number | null): MetaschemaResult {
-    const result: MetaschemaResult = { output, exitCode };
+function parseMetaschemaResult(output, exitCode) {
+    const result = { output, exitCode };
 
     if (exitCode === 1) {
         const cliError = parseCliError(output);
@@ -162,28 +161,11 @@ function parseMetaschemaResult(output: string, exitCode: number | null): Metasch
         }
     }
 
-    // TODO(upstream): `metaschema --json` prepends the file path before the
-    // JSON object and wraps errors in `{ valid, errors: [...] }`. Until the
-    // CLI returns clean JSON on stdout, extract the errors array by hand.
-    // Reproduce: jsonschema metaschema --http --json invalid-metaschema.json
     if (exitCode === 2) {
         try {
-            let jsonStr = output.trim();
-            const jsonStart = jsonStr.indexOf('[');
-            const jsonEnd = jsonStr.lastIndexOf(']');
-            if (jsonStart !== -1 && jsonEnd !== -1 && jsonStart < jsonEnd) {
-                jsonStr = jsonStr.substring(jsonStart, jsonEnd + 1);
-            }
-
-            const parsed = JSON.parse(jsonStr);
-            if (Array.isArray(parsed)) {
-                result.errors = parsed.map((entry: {
-                    error?: string;
-                    instanceLocation?: string;
-                    keywordLocation?: string;
-                    absoluteKeywordLocation?: string;
-                    instancePosition?: Position;
-                }) => ({
+            const parsed = JSON.parse(output);
+            if (parsed.errors && Array.isArray(parsed.errors)) {
+                result.errors = parsed.errors.map((entry) => ({
                     error: entry.error || 'Validation error',
                     instanceLocation: entry.instanceLocation || '',
                     keywordLocation: entry.keywordLocation || '',
@@ -198,7 +180,7 @@ function parseMetaschemaResult(output: string, exitCode: number | null): Metasch
     return result;
 }
 
-function errorPositionToRange(position: Position): vscode.Range {
+function errorPositionToRange(position) {
     const [lineStart, columnStart, lineEnd, columnEnd] = position;
 
     if (lineStart === 1 && columnStart === 1 && (lineEnd > lineStart || columnEnd > columnStart)) {
@@ -214,7 +196,7 @@ function errorPositionToRange(position: Position): vscode.Range {
     );
 }
 
-function buildPanelState(fileInfo: FileInfo | null, overrides?: Partial<PanelState>): PanelState {
+function buildPanelState(fileInfo, overrides) {
     return {
         fileInfo,
         cliVersion: cachedCliVersion,
@@ -228,24 +210,20 @@ function buildPanelState(fileInfo: FileInfo | null, overrides?: Partial<PanelSta
     };
 }
 
-function updatePanel(state: PanelState): void {
+function updatePanel(state) {
     panel?.webview.postMessage({ type: 'update', state });
 }
 
-function buildRelatedInfo(
-    location: vscode.Location,
-    messages: (string | undefined | false | null)[]
-): vscode.DiagnosticRelatedInformation[] | undefined {
+function buildRelatedInfo(location, messages) {
     const entries = messages
-        .filter((message): message is string => !!message)
+        .filter((message) => !!message)
         .map(message => new vscode.DiagnosticRelatedInformation(location, message));
     return entries.length > 0 ? entries : undefined;
 }
 
-function updateLintDiagnostics(documentUri: vscode.Uri, errors: LintError[]): void {
+function updateLintDiagnostics(documentUri, errors) {
     const diagnostics = errors
-        .filter((error): error is LintError & { position: Position } =>
-            error.position !== null)
+        .filter((error) => error.position !== null)
         .map(error => {
             const range = errorPositionToRange(error.position);
             const diagnostic = new vscode.Diagnostic(
@@ -275,14 +253,9 @@ function updateLintDiagnostics(documentUri: vscode.Uri, errors: LintError[]): vo
     lintDiagnostics.set(documentUri, diagnostics);
 }
 
-function updateMetaschemaDiagnostics(
-    documentUri: vscode.Uri,
-    errors: (MetaschemaError | CliError)[]
-): void {
+function updateMetaschemaDiagnostics(documentUri, errors) {
     const diagnostics = errors
-        .filter((error): error is MetaschemaError & { instancePosition: Position } => {
-            return 'instancePosition' in error && error.instancePosition !== undefined;
-        })
+        .filter((error) => 'instancePosition' in error && error.instancePosition !== undefined)
         .map(error => {
             const range = errorPositionToRange(error.instancePosition);
             const diagnostic = new vscode.Diagnostic(
@@ -309,7 +282,7 @@ function updateMetaschemaDiagnostics(
     metaschemaDiagnostics.set(documentUri, diagnostics);
 }
 
-function handleWebviewMessage(message: WebviewToExtensionMessage): void {
+function handleWebviewMessage(message) {
     if (message.command === 'ready') {
         webviewReady = true;
         console.log('[Sourcemeta Studio] Webview ready');
@@ -375,7 +348,7 @@ function handleWebviewMessage(message: WebviewToExtensionMessage): void {
     }
 }
 
-function handleActiveEditorChange(editor: vscode.TextEditor | undefined): void {
+function handleActiveEditorChange(editor) {
     if (!editor || editor.document.uri.scheme !== 'file') {
         return;
     }
@@ -405,7 +378,7 @@ function handleActiveEditorChange(editor: vscode.TextEditor | undefined): void {
     }
 }
 
-function handleDocumentSave(document: vscode.TextDocument): void {
+function handleDocumentSave(document) {
     if (panel && lastActiveTextEditor &&
         document.uri.fsPath === lastActiveTextEditor.document.uri.fsPath &&
         getFileInfo(document.uri.fsPath)) {
@@ -413,7 +386,7 @@ function handleDocumentSave(document: vscode.TextDocument): void {
     }
 }
 
-function createOrRevealPanel(context: vscode.ExtensionContext): void {
+function createOrRevealPanel(context) {
     const columnToShowIn = vscode.window.activeTextEditor
         ? vscode.ViewColumn.Beside
         : vscode.ViewColumn.One;
@@ -458,7 +431,7 @@ function createOrRevealPanel(context: vscode.ExtensionContext): void {
     }, null, context.subscriptions);
 }
 
-async function updatePanelContent(): Promise<void> {
+async function updatePanelContent() {
     if (!panel) {
         return;
     }
@@ -505,7 +478,7 @@ async function updatePanelContent(): Promise<void> {
             updateMetaschemaDiagnostics(lastActiveTextEditor.document.uri, metaschemaResult.errors);
         }
     } catch (error) {
-        const errorMessage = (error as Error).message;
+        const errorMessage = error.message;
         cachedCliVersion = `Error: ${errorMessage}`;
         currentPanelState = buildPanelState(fileInfo, {
             lintResult: { raw: `Error: ${errorMessage}`, health: null, error: true },
@@ -517,7 +490,7 @@ async function updatePanelContent(): Promise<void> {
     }
 }
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+async function activate(context) {
     try {
         const packageJsonPath = path.join(context.extensionPath, 'package.json');
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -557,8 +530,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 }
 
-export function deactivate(): void {
+function deactivate() {
     panel?.dispose();
     lintDiagnostics?.dispose();
     metaschemaDiagnostics?.dispose();
 }
+
+module.exports = { activate, deactivate };

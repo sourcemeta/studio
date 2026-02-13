@@ -21,9 +21,8 @@
         "--extensionTestsPath=${workspaceFolder}/../test/vscode"
       ],
       "outFiles": [
-        "${workspaceFolder}/../build/vscode/**/*.js"
-      ],
-      "preLaunchTask": "${defaultBuildTask}"
+        "${workspaceFolder}/**/*.js"
+      ]
     }
   ]
 }
