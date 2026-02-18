@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A valid test schema",
+  "description": "This schema passes lint, metaschema, and format checks",
+  "examples": [
+    {
+      "name": "test"
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "description": "The name field",
+      "type": "string"
+    }
+  }
+}

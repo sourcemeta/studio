@@ -1,4 +1,4 @@
-import type { FileInfo } from '../../../protocol/types';
+import type { FileInfo } from '../protocol/types';
 import { AlertTriangle } from 'lucide-react';
 
 export interface LoadingSpinnerProps {

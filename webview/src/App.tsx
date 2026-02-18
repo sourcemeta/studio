@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { PanelState, TabType } from '../../protocol/types';
+import type { PanelState, TabType } from './protocol/types';
 import { getActiveTab, setActiveTab as setActiveTabInState, notifyReady } from './message';
 import { FileInfo } from './components/FileInfo';
 import { HealthBar } from './components/HealthBar';

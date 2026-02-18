@@ -1,4 +1,4 @@
-import type { TabType, WebviewState, WebviewToExtensionMessage, Position } from '../../protocol/types';
+import type { TabType, WebviewState, WebviewToExtensionMessage, Position } from './protocol/types';
 
 interface VSCodeAPI {
   postMessage(message: unknown): void;

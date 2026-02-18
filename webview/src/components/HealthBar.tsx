@@ -1,4 +1,4 @@
-import type { LintResult } from '../../../protocol/types';
+import type { LintResult } from '../protocol/types';
 
 export interface HealthBarProps {
   lintResult: LintResult;

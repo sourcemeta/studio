@@ -1,4 +1,4 @@
-import type { PanelState } from '../../../protocol/types';
+import type { PanelState } from '../protocol/types';
 import type { LucideIcon } from 'lucide-react';
 import { calculateLintStatus, calculateFormatStatus, calculateMetaschemaStatus } from '../utils/tabStatus';
 

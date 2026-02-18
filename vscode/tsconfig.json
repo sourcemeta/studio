@@ -1,7 +1,0 @@
-{
-  "extends": "../tsconfig.node.json",
-  "compilerOptions": {
-    "outDir": "../build/vscode"
-  },
-  "include": ["src/**/*", "../shared/**/*"]
-}
