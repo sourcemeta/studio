@@ -2,6 +2,7 @@ import type { MetaschemaResult, MetaschemaError, Position } from '../protocol/ty
 import { goToPosition } from '../message';
 import { RawOutput } from './RawOutput';
 import { CheckCircle, AlertTriangle, FileQuestion } from 'lucide-react';
+import { MetaschemaStackTrace } from './MetaschemaStackTrace';
 
 export interface MetaschemaTabProps {
   metaschemaResult: MetaschemaResult;
@@ -55,55 +56,7 @@ export function MetaschemaTab({ metaschemaResult, noFileSelected }: MetaschemaTa
     return (
       <div>
         <div className="flex flex-col gap-3 mb-5">
-          {metaschemaErrors.map((error, index) => (
-            <div
-              key={index}
-              className="bg-(--vscode-selection) border-l-[3px] rounded p-3 cursor-pointer transition-colors hover:bg-(--vscode-hover)"
-              style={{ 
-                cursor: error.instancePosition ? 'pointer' : 'default',
-                borderLeftColor: 'var(--error)'
-              }}
-              onClick={() => error.instancePosition && handleGoToPosition(error.instancePosition)}
-            >
-              <div className="mb-2">
-                <div className="text-(--vscode-fg) text-[13px] font-semibold">
-                  {error.error}
-                </div>
-              </div>
-              <div className="flex flex-col gap-1 text-[11px]">
-                {error.instancePosition && (
-                  <div className="flex gap-1.5">
-                    <span className="text-(--vscode-muted) font-semibold min-w-20">
-                      Location:
-                    </span>
-                    <span className="text-(--vscode-fg) font-(--vscode-editor-font)">
-                      Line {error.instancePosition[0]}, Col {error.instancePosition[1]}
-                    </span>
-                  </div>
-                )}
-                {error.instanceLocation && (
-                  <div className="flex gap-1.5">
-                    <span className="text-(--vscode-muted) font-semibold min-w-20">
-                      Path:
-                    </span>
-                    <span className="text-(--vscode-fg) font-(--vscode-editor-font) break-all">
-                      {error.instanceLocation || '(root)'}
-                    </span>
-                  </div>
-                )}
-                {error.keywordLocation && (
-                  <div className="flex gap-1.5">
-                    <span className="text-(--vscode-muted) font-semibold min-w-20">
-                      Schema:
-                    </span>
-                    <span className="text-(--vscode-fg) font-(--vscode-editor-font) break-all">
-                      {error.keywordLocation}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+          <MetaschemaStackTrace errors={metaschemaErrors}/>
         </div>
         <RawOutput output={metaschemaResult.output} />
       </div>
@@ -128,12 +81,12 @@ export function MetaschemaTab({ metaschemaResult, noFileSelected }: MetaschemaTa
       error && 'instancePosition' in error && error.instancePosition
         ? error.instancePosition
         : null;
-    
+
     return (
       <>
-        <div 
+        <div
           className="bg-(--vscode-selection) border-l-[3px] rounded p-4 mb-5 transition-colors"
-          style={{ 
+          style={{
             borderLeftColor: 'var(--fatal)',
             cursor: errorPosition ? 'pointer' : 'default'
           }}
