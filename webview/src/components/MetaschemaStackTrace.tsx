@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { MetaschemaError,Position } from "../../../protocol/types";
+import type { MetaschemaError,Position } from "../protocol/types";
 import { goToPosition } from "../message";
 
 interface Props {
