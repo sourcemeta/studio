@@ -167,9 +167,20 @@ suite('Extension Test Suite', () => {
         const document = await openFixture('test-schema.json');
         await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
         const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
-        const ruleIds = diagnostics.map(d => d.code.value);
+        const ruleIds = diagnostics.map(d => d.code);
         assert.ok(ruleIds.includes('top_level_description'));
         assert.ok(ruleIds.includes('top_level_examples'));
+    });
+
+    test('Should not provide a URL target for lint diagnostic codes', async function() {
+        this.timeout(15000);
+        await activateExtension();
+        const document = await openFixture('test-schema.json');
+        await vscode.commands.executeCommand('sourcemeta-studio.openPanel');
+        const diagnostics = await waitForDiagnostics(document.uri, LINT_SOURCE);
+        for (const diagnostic of diagnostics) {
+            assert.strictEqual(typeof diagnostic.code, 'string');
+        }
     });
 
     test('Should include related information in lint diagnostics', async function() {
