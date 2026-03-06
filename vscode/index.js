@@ -232,12 +232,8 @@ function updateLintDiagnostics(documentUri, errors) {
 
             diagnostic.source = 'Sourcemeta Studio (Lint)';
 
-            if (error.id) {
-                diagnostic.code = {
-                    value: error.id,
-                    target: vscode.Uri.parse(`https://github.com/Karan-Palan/json-schema-lint-rules/tree/main/docs/${error.id}.md`)
-                };
-            }
+            // TODO: Provide a documentation URL target when we have per-rule docs
+            diagnostic.code = error.id;
 
             diagnostic.relatedInformation = buildRelatedInfo(
                 new vscode.Location(documentUri, range), [
