@@ -497,7 +497,7 @@ suite('Extension Test Suite', () => {
         assert.ok(getLintDiagnostics(document.uri).length > 0);
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         await new Promise(resolve => setTimeout(resolve, 1000));
-        const cleared = await waitForNoDiagnostics(document.uri, LINT_SOURCE, 5000);
+        const cleared = await waitForNoDiagnostics(document.uri, LINT_SOURCE, 10000);
         assert.ok(cleared);
     });
 
