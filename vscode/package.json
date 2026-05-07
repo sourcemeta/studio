@@ -3,7 +3,7 @@
   "displayName": "Sourcemeta JSON Schema Studio",
   "publisher": "sourcemeta",
   "description": "JSON Schema inspection, formatting, and linting tools by a member of the JSON Schema Technical Steering Committee",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "icon": "logo.png",
   "engines": {
     "vscode": "^1.74.0"
