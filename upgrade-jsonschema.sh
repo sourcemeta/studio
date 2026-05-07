@@ -31,6 +31,6 @@ npm install "@sourcemeta/jsonschema@$VERSION"
 cd -
 
 git add vscode/package.json vscode/package-lock.json
-git ci --message "Upgrade JSON Schema to v$VERSION"
-
-pr
+git commit --signoff --message "Upgrade JSON Schema to v$VERSION"
+git push-track
+gh pr create --fill
