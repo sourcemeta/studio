@@ -25,23 +25,6 @@ After installing the Sourcemeta Studio extension, issues are not displayed autom
 > Data Products with JSON
 > Schema](https://www.oreilly.com/library/view/unifying-business-data/9781098144999/).
 
-Publisher & Verification Status
--------------------------------
-
-Sourcemeta Studio is published and maintained by the **official Sourcemeta
-organization**, the team behind open-source JSON Schema tooling used in
-production by developers and companies worldwide.
-
-At the time of writing, the Visual Studio Code Marketplace **Verified Publisher**
-badge has not yet been applied to this extension. Publisher verification is a
-Microsoft-managed, administrative process that is independent of an
-extension’s code quality, security posture, or maintenance status, and can take
-time even for established open-source organizations.
-
-This extension is actively maintained by the Sourcemeta team, and all releases
-are built from the same public repositories that power Sourcemeta’s other
-open-source projects.
-
 Features
 --------
 
