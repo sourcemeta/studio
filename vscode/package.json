@@ -75,6 +75,6 @@
   ],
   "qna": "marketplace",
   "dependencies": {
-    "@sourcemeta/jsonschema": "^16.1.0"
+    "@sourcemeta/jsonschema": "^16.2.0"
   }
 }
