@@ -50,3 +50,10 @@ Support
 - **Issues**: [GitHub Issues](https://github.com/sourcemeta/studio/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/sourcemeta/studio/discussions)
 - **Email**: hello@sourcemeta.com
+
+Contributing
+------------
+
+By contributing to this project, you agree to our organisation-wide
+[contribution
+guidelines](https://github.com/sourcemeta/.github/blob/main/CONTRIBUTING.md).
